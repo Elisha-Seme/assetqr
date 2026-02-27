@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — AFOSI Asset Registry</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px rgba(0,0,0,.07), 0 10px 24px rgba(0,0,0,.08);
+      width: 100%;
+      max-width: 380px;
+      overflow: hidden;
+    }
+    .card-top {
+      background: #0f172a;
+      padding: 32px 32px 28px;
+      text-align: center;
+    }
+    .logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 52px; height: 52px;
+      background: #3b82f6;
+      border-radius: 14px;
+      margin-bottom: 14px;
+    }
+    .logo-wrap svg { width: 28px; height: 28px; stroke: white; }
+    .card-title { color: white; font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+    .card-sub   { color: #94a3b8; font-size: 13px; margin-top: 4px; }
+    .card-body  { padding: 28px 32px 32px; }
+    .form-group { margin-bottom: 16px; }
+    label {
+      display: block;
+      font-size: 12px; font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase; letter-spacing: .4px;
+      margin-bottom: 6px;
+    }
+    input[type=text], input[type=password] {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      font-size: 14px; color: #1e293b;
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
+    }
+    input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+    }
+    .btn {
+      width: 100%; padding: 11px;
+      background: #3b82f6; color: white;
+      border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+      margin-top: 8px;
+    }
+    .btn:hover { background: #2563eb; }
+    .error {
+      background: #fee2e2; color: #991b1b;
+      border: 1px solid #fecaca;
+      border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hint {
+      text-align: center; margin-top: 20px;
+      font-size: 11px; color: #94a3b8; line-height: 1.6;
+    }
+    .hint a { color: #3b82f6; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-top">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3M14 21h5"/>
+      </svg>
+    </div>
+    <div class="card-title">AFOSI Asset Registry</div>
+    <div class="card-sub">Sign in to manage assets</div>
+  </div>
+
+  <div class="card-body">
+    {% if error %}
+    <div class="error">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="admin"
+               value="{{ request.form.get('username', '') }}" autocomplete="username" autofocus>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn">Sign In</button>
+    </form>
+
+    <div class="hint">
+      Scanning a QR code? Asset detail pages are public —<br>
+      no sign-in needed to view individual asset info.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
