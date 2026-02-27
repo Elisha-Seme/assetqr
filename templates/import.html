@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Import Assets — AssetQR{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Import Assets</h1>
+    <p class="page-sub">Bulk-add assets and auto-generate QR codes</p>
+  </div>
+</div>
+
+<div class="import-layout">
+  <!-- Left: Input -->
+  <div class="card" style="flex:1">
+    <div class="card-header">
+      <h2 class="card-title">Paste Your List</h2>
+    </div>
+    <div class="card-body">
+      <!-- Format tabs -->
+      <div class="tab-bar" id="fmt-tabs">
+        <button class="tab active" data-tab="simple" onclick="switchTab('simple', this)">Simple List</button>
+        <button class="tab" data-tab="csv" onclick="switchTab('csv', this)">CSV / Detailed</button>
+        <button class="tab" data-tab="file" onclick="switchTab('file', this)">Upload File</button>
+      </div>
+
+      <!-- Simple list -->
+      <div id="tab-simple" class="tab-content">
+        <p class="hint-text">One asset name per line. Asset IDs are auto-generated.</p>
+        <textarea id="simple-text" class="import-textarea" rows="12"
+          placeholder="Office Chair&#10;Dell Laptop XPS 13&#10;HP LaserJet Printer&#10;Standing Desk&#10;24&quot; Monitor LG&#10;iPhone 14 Pro"></textarea>
+      </div>
+
+      <!-- CSV detailed -->
+      <div id="tab-csv" class="tab-content" style="display:none">
+        <p class="hint-text">First line must be headers. Recognised columns:
+          <code>name</code>, <code>asset_id</code>, <code>category</code>,
+          <code>location</code>, <code>serial_number</code>, <code>description</code>,
+          <code>status</code>, <code>notes</code>. Separate with comma or pipe (<code>|</code>).</p>
+        <textarea id="csv-text" class="import-textarea" rows="12"
+          placeholder="name,category,location,serial_number&#10;Dell Laptop XPS 13,IT Equipment,Room 201,SN-001&#10;Office Chair,Furniture,Room 101,&#10;HP Printer,IT Equipment,Room 201,SN-HP-01"></textarea>
+      </div>
+
+      <!-- File upload -->
+      <div id="tab-file" class="tab-content" style="display:none">
+        <p class="hint-text">Upload a <code>.csv</code> or <code>.txt</code> file. Same format as the CSV tab.</p>
+        <label class="file-drop" id="file-drop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:#94a3b8">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p>Drag &amp; drop a file here, or <span style="color:#3b82f6">click to browse</span></p>
+          <p id="file-name" style="font-size:12px;color:#64748b;margin-top:4px"></p>
+          <input type="file" id="file-input" accept=".csv,.txt" style="display:none" onchange="handleFileSelect(this)">
+        </label>
+        <textarea id="file-text" class="import-textarea" rows="8" placeholder="File content will appear here…" style="margin-top:12px"></textarea>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-primary" onclick="parseImport()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Preview
+        </button>
+        <button class="btn btn-ghost" onclick="clearImport()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Preview + result -->
+  <div style="flex:1.4;min-width:0">
+    <div class="card" id="preview-card" style="display:none">
+      <div class="card-header">
+        <h2 class="card-title">Preview <span id="preview-count" class="badge badge--active"></span></h2>
+        <button class="btn btn-primary btn--sm" onclick="executeImport()" id="import-btn">
+          Import All
+        </button>
+      </div>
+      <div class="card-body" style="padding:0;overflow-x:auto">
+        <table class="table table--compact" id="preview-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Asset ID</th>
+              <th>Category</th>
+              <th>Location</th>
+              <th>Serial</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="preview-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div id="result-card" class="card" style="display:none">
+      <div class="card-header">
+        <h2 class="card-title">Import Result</h2>
+      </div>
+      <div class="card-body" id="result-body"></div>
+    </div>
+
+    <!-- Tips -->
+    <div class="card" id="tips-card">
+      <div class="card-header"><h2 class="card-title">Tips</h2></div>
+      <div class="card-body">
+        <ul class="tip-list">
+          <li><strong>Long-lasting QR codes</strong> — QR codes encode the URL <code>{ base_url }/asset/{ asset_id }</code>. Set a stable public domain in <a href="{{ url_for('settings_page') }}">Settings</a> so codes remain valid forever.</li>
+          <li><strong>Error correction</strong> — All QR codes use Level H (30 % damage tolerance), so they survive scratches and minor wear.</li>
+          <li><strong>Asset IDs</strong> — Auto-generated from the name (e.g. "Office Chair" → <code>office-chair-0001</code>). You can override them in the CSV column <code>asset_id</code>.</li>
+          <li><strong>After import</strong> — Go to <a href="{{ url_for('assets_page') }}">Assets</a> to view, filter, and export QR codes as PDF or label sheets.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let parsedItems = [];
+let currentTab = 'simple';
+
+function switchTab(name, btn) {
+  currentTab = name;
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).style.display = '';
+  btn.classList.add('active');
+}
+
+function getText() {
+  if (currentTab === 'simple')  return document.getElementById('simple-text').value;
+  if (currentTab === 'csv')     return document.getElementById('csv-text').value;
+  if (currentTab === 'file')    return document.getElementById('file-text').value;
+  return '';
+}
+
+function parseImport() {
+  const raw = getText().trim();
+  if (!raw) { toast('Paste some content first', 'error'); return; }
+  parsedItems = parseText(raw);
+  if (!parsedItems.length) { toast('No valid rows found', 'error'); return; }
+
+  renderPreview(parsedItems);
+  document.getElementById('preview-card').style.display = '';
+  document.getElementById('tips-card').style.display = 'none';
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('import-btn').textContent = `Import ${parsedItems.length} Asset${parsedItems.length !== 1 ? 's' : ''}`;
+}
+
+function parseText(raw) {
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+
+  // Detect if first line is a header row
+  const firstLower = lines[0].toLowerCase().replace(/[|]/g, ',');
+  const knownHeaders = ['name','asset_id','category','location','serial_number','serial','description','status','notes'];
+  const isHeader = knownHeaders.some(h => firstLower.includes(h));
+
+  if (isHeader) {
+    return parseCSV(lines);
+  } else {
+    // Simple list — just names
+    return lines.map(l => ({ name: l }));
+  }
+}
+
+function parseCSV(lines) {
+  const sep = lines[0].includes('|') ? '|' : ',';
+  const headers = lines[0].split(sep).map(h => h.trim().toLowerCase()
+    .replace(/\s+/g,'_').replace(/serial$/,'serial_number'));
+  const items = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(sep).map(c => c.trim());
+    if (cols.every(c => !c)) continue;
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = cols[idx] || ''; });
+    if (obj.name) items.push(obj);
+  }
+  return items;
+}
+
+function renderPreview(items) {
+  const tbody = document.getElementById('preview-tbody');
+  tbody.innerHTML = '';
+  document.getElementById('preview-count').textContent = items.length;
+  items.forEach((item, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${esc(item.name)}</strong></td>
+      <td><code style="font-size:11px">${esc(item.asset_id || '(auto)')}</code></td>
+      <td>${esc(item.category || '')}</td>
+      <td>${esc(item.location || '')}</td>
+      <td>${esc(item.serial_number || item.serial || '')}</td>
+      <td><button class="icon-btn icon-btn--danger" onclick="removePreviewRow(${i})" title="Remove">×</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function removePreviewRow(i) {
+  parsedItems.splice(i, 1);
+  if (!parsedItems.length) {
+    document.getElementById('preview-card').style.display = 'none';
+    document.getElementById('tips-card').style.display = '';
+  } else {
+    renderPreview(parsedItems);
+    document.getElementById('import-btn').textContent = `Import ${parsedItems.length} Asset${parsedItems.length !== 1 ? 's' : ''}`;
+  }
+}
+
+async function executeImport() {
+  if (!parsedItems.length) return;
+  const btn = document.getElementById('import-btn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    const res = await fetch('/api/assets/bulk', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ items: parsedItems })
+    });
+    const data = await res.json();
+    showResult(data);
+    document.getElementById('preview-card').style.display = 'none';
+    parsedItems = [];
+  } catch(e) {
+    toast('Import failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function showResult(data) {
+  const rc = document.getElementById('result-card');
+  const rb = document.getElementById('result-body');
+  rc.style.display = '';
+  document.getElementById('tips-card').style.display = 'none';
+  let html = `
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+      <div class="stat-mini stat-mini--green"><div class="stat-mini-val">${data.success}</div><div class="stat-mini-lbl">Imported</div></div>
+      <div class="stat-mini stat-mini--red"><div class="stat-mini-val">${data.failed}</div><div class="stat-mini-lbl">Failed</div></div>
+    </div>`;
+  if (data.errors && data.errors.length) {
+    html += `<details><summary style="cursor:pointer;font-size:13px;color:#dc2626">Show ${data.errors.length} error(s)</summary><ul style="margin-top:8px;font-size:12px;color:#64748b">`;
+    data.errors.forEach(e => { html += `<li>${esc(e)}</li>`; });
+    html += '</ul></details>';
+  }
+  if (data.success > 0) {
+    html += `<div style="margin-top:16px;display:flex;gap:8px">
+      <a href="/assets" class="btn btn-primary btn--sm">View Assets</a>
+      <a href="/export/pdf" class="btn btn-ghost btn--sm">Export PDF</a>
+    </div>`;
+    toast(`${data.success} asset${data.success!==1?'s':''} imported!`);
+  }
+  rb.innerHTML = html;
+}
+
+function clearImport() {
+  document.getElementById('simple-text').value = '';
+  document.getElementById('csv-text').value = '';
+  document.getElementById('file-text').value = '';
+  document.getElementById('preview-card').style.display = 'none';
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('tips-card').style.display = '';
+  parsedItems = [];
+}
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('file-name').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('file-text').value = e.target.result;
+  };
+  reader.readAsText(file);
+}
+
+// Drag and drop
+const drop = document.getElementById('file-drop');
+if (drop) {
+  drop.addEventListener('click', () => document.getElementById('file-input').click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      document.getElementById('file-name').textContent = file.name;
+      const r = new FileReader();
+      r.onload = ev => { document.getElementById('file-text').value = ev.target.result; };
+      r.readAsText(file);
+    }
+  });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

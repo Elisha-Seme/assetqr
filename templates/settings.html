@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Settings — AssetQR{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Settings</h1>
+    <p class="page-sub">Configure your organisation and QR code options</p>
+  </div>
+</div>
+
+<div style="max-width:640px">
+  <div class="card">
+    <div class="card-header"><h2 class="card-title">General</h2></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label for="s-company">Organisation / Company Name</label>
+        <input type="text" id="s-company" value="{{ s.get('company_name', '') }}"
+               placeholder="My Organisation">
+        <p class="field-hint">Shown on asset detail pages and PDF exports.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2 class="card-title">QR Code Settings</h2></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label for="s-base-url">Base URL <span class="req">*</span></label>
+        <input type="url" id="s-base-url" value="{{ s.get('base_url', 'http://localhost:5001') }}"
+               placeholder="https://assets.mycompany.com">
+        <p class="field-hint">
+          Each QR code encodes <code>{ base_url }/asset/{ asset_id }</code>.
+          For <strong>long-lasting QR codes</strong>, use a stable public URL
+          (e.g. your company domain) so codes remain scannable after moving servers.
+          <strong>Changing this will regenerate all QR codes automatically.</strong>
+        </p>
+      </div>
+      <div class="form-group">
+        <label for="s-qr-color">QR Code Colour</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="color" id="s-qr-color" value="{{ s.get('qr_color', '#000000') }}"
+                 style="width:48px;height:36px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;padding:2px">
+          <input type="text" id="s-qr-color-hex" value="{{ s.get('qr_color', '#000000') }}"
+                 style="width:100px" placeholder="#000000" oninput="syncColor('hex')">
+        </div>
+        <p class="field-hint">Changing colour will regenerate all QR codes.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2 class="card-title">Actions</h2></div>
+    <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Save Settings
+      </button>
+      <button class="btn btn-ghost" onclick="regenAllQR()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+        </svg>
+        Regenerate All QR Codes
+      </button>
+    </div>
+    <div id="settings-msg" class="card-body" style="display:none;padding-top:0"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function syncColor(source) {
+  const picker = document.getElementById('s-qr-color');
+  const hex    = document.getElementById('s-qr-color-hex');
+  if (source === 'hex') {
+    const val = hex.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
+  } else {
+    hex.value = picker.value;
+  }
+}
+document.getElementById('s-qr-color').addEventListener('input', () => syncColor('picker'));
+
+async function saveSettings() {
+  const data = {
+    company_name: document.getElementById('s-company').value.trim(),
+    base_url:     document.getElementById('s-base-url').value.trim(),
+    qr_color:     document.getElementById('s-qr-color').value,
+  };
+  if (!data.base_url) { toast('Base URL is required', 'error'); return; }
+  const btn = event.currentTarget;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const d = await res.json();
+    if (d.success) toast('Settings saved. QR codes regenerated.');
+    else toast('Error: ' + (d.error || 'unknown'), 'error');
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Settings';
+  }
+}
+
+async function regenAllQR() {
+  if (!confirm('Regenerate all QR codes with current settings?')) return;
+  const btn = event.currentTarget;
+  btn.disabled = true; btn.textContent = 'Regenerating…';
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        base_url:  document.getElementById('s-base-url').value.trim(),
+        qr_color:  document.getElementById('s-qr-color').value,
+      })
+    });
+    const d = await res.json();
+    if (d.success) toast('All QR codes regenerated!');
+    else toast('Error', 'error');
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Regenerate All QR Codes';
+  }
+}
+</script>
+{% endblock %}
