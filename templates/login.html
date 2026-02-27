@@ -7,81 +7,102 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
     }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(59,130,246,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
     .card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 4px 6px rgba(0,0,0,.07), 0 10px 24px rgba(0,0,0,.08);
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 20px;
+      box-shadow: 0 25px 50px rgba(0,0,0,.5);
       width: 100%;
       max-width: 380px;
       overflow: hidden;
+      position: relative;
     }
     .card-top {
-      background: #0f172a;
-      padding: 32px 32px 28px;
+      padding: 36px 32px 28px;
       text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,.07);
     }
     .logo-wrap {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 52px; height: 52px;
-      background: #3b82f6;
-      border-radius: 14px;
-      margin-bottom: 14px;
+      margin-bottom: 18px;
     }
-    .logo-wrap svg { width: 28px; height: 28px; stroke: white; }
-    .card-title { color: white; font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
-    .card-sub   { color: #94a3b8; font-size: 13px; margin-top: 4px; }
-    .card-body  { padding: 28px 32px 32px; }
+    .logo-wrap img {
+      height: 80px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 12px rgba(59,130,246,.3));
+    }
+    .card-title {
+      color: #f1f5f9;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -.3px;
+    }
+    .card-sub { color: #64748b; font-size: 13px; margin-top: 5px; }
+    .card-body { padding: 28px 32px 32px; }
     .form-group { margin-bottom: 16px; }
     label {
       display: block;
-      font-size: 12px; font-weight: 600;
+      font-size: 11px; font-weight: 600;
       color: #64748b;
-      text-transform: uppercase; letter-spacing: .4px;
-      margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 7px;
     }
     input[type=text], input[type=password] {
-      width: 100%; padding: 10px 12px;
-      border: 1.5px solid #e2e8f0; border-radius: 8px;
-      font-size: 14px; color: #1e293b;
+      width: 100%; padding: 11px 14px;
+      background: #0f172a;
+      border: 1px solid rgba(255,255,255,.1); border-radius: 10px;
+      font-size: 14px; color: #f1f5f9;
       transition: border-color .15s, box-shadow .15s;
       outline: none;
     }
+    input[type=text]::placeholder, input[type=password]::placeholder { color: #475569; }
     input:focus {
       border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.2);
     }
     .btn {
-      width: 100%; padding: 11px;
+      width: 100%; padding: 12px;
       background: #3b82f6; color: white;
-      border: none; border-radius: 8px;
+      border: none; border-radius: 10px;
       font-size: 14px; font-weight: 600;
       cursor: pointer;
-      transition: background .15s;
-      margin-top: 8px;
+      transition: background .15s, transform .1s, box-shadow .15s;
+      margin-top: 6px;
+      letter-spacing: .1px;
     }
-    .btn:hover { background: #2563eb; }
+    .btn:hover { background: #2563eb; box-shadow: 0 4px 14px rgba(59,130,246,.4); }
+    .btn:active { transform: scale(.98); }
     .error {
-      background: #fee2e2; color: #991b1b;
-      border: 1px solid #fecaca;
-      border-radius: 8px; padding: 10px 14px;
+      background: rgba(239,68,68,.15); color: #fca5a5;
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: 10px; padding: 11px 14px;
       font-size: 13px; margin-bottom: 16px;
       display: flex; align-items: center; gap: 8px;
     }
     .hint {
-      text-align: center; margin-top: 20px;
-      font-size: 11px; color: #94a3b8; line-height: 1.6;
+      text-align: center; margin-top: 22px;
+      font-size: 12px; color: #475569; line-height: 1.6;
     }
-    .hint a { color: #3b82f6; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -89,12 +110,7 @@
 <div class="card">
   <div class="card-top">
     <div class="logo-wrap">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
-        <rect x="3" y="3" width="7" height="7" rx="1"/>
-        <rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/>
-        <path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3M14 21h5"/>
-      </svg>
+      <img src="/static/afosi_logo.png" alt="AFOSI Logo">
     </div>
     <div class="card-title">AFOSI Asset Registry</div>
     <div class="card-sub">Sign in to manage assets</div>
@@ -124,8 +140,7 @@
     </form>
 
     <div class="hint">
-      Scanning a QR code? Asset detail pages are public —<br>
-      no sign-in needed to view individual asset info.
+      Scanning a QR code? Asset detail pages are public —<br>no sign-in needed to view individual asset info.
     </div>
   </div>
 </div>

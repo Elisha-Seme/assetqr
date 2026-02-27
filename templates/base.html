@@ -8,16 +8,27 @@
 </head>
 <body>
 
-<nav class="sidebar">
+<!-- Mobile top bar (hidden on desktop) -->
+<header class="mobile-header">
+  <button class="mobile-hamburger" id="mobile-hamburger" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <img src="{{ url_for('static', filename='afosi_logo.png') }}" alt="AFOSI" class="mobile-brand-logo">
+  <span class="mobile-brand-name">Asset Registry</span>
+</header>
+
+<!-- Sidebar backdrop (mobile) -->
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+<nav class="sidebar" id="sidebar">
   <div class="sidebar-brand">
-    <div class="brand-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/>
-        <path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3M14 21h5"/>
-      </svg>
+    <img src="{{ url_for('static', filename='afosi_logo.png') }}" alt="AFOSI" class="brand-logo">
+    <div>
+      <div class="brand-name">AFOSI</div>
+      <div class="brand-sub">Asset Registry</div>
     </div>
-    <span class="brand-name">AssetQR</span>
   </div>
 
   <ul class="nav-list">
@@ -71,7 +82,7 @@
       </svg>
       Sign Out
     </a>
-    <div style="font-size:10px;color:rgba(255,255,255,.15);margin-top:6px">AssetQR v1.0</div>
+    <div style="font-size:10px;color:rgba(255,255,255,.15);margin-top:8px">AssetQR v1.0</div>
   </div>
 </nav>
 
@@ -155,7 +166,7 @@
     <button class="modal-close" onclick="closeAllModals()">&times;</button>
   </div>
   <div class="modal-body" style="text-align:center">
-    <img id="qr-preview-img" src="" alt="QR Code" style="max-width:260px;border:1px solid #e2e8f0;border-radius:8px;padding:8px">
+    <img id="qr-preview-img" src="" alt="QR Code" style="max-width:220px;border:1px solid #e2e8f0;border-radius:8px;padding:8px">
     <p id="qr-preview-url" style="font-size:11px;color:#64748b;word-break:break-all;margin-top:8px"></p>
   </div>
   <div class="modal-footer" style="justify-content:center;gap:8px">
@@ -188,5 +199,39 @@
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 {% block scripts %}{% endblock %}
+
+<script>
+/* ── Mobile sidebar toggle ──────────────────────────────────────────────── */
+(function () {
+  var hamburger = document.getElementById('mobile-hamburger');
+  var sidebar   = document.getElementById('sidebar');
+  var overlay   = document.getElementById('sidebar-overlay');
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  if (hamburger) {
+    hamburger.addEventListener('click', function () {
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+  }
+  if (overlay) {
+    overlay.addEventListener('click', closeSidebar);
+  }
+  sidebar.querySelectorAll('.nav-link').forEach(function (link) {
+    link.addEventListener('click', function () {
+      if (window.innerWidth <= 768) closeSidebar();
+    });
+  });
+})();
+</script>
 </body>
 </html>
