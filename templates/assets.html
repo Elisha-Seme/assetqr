@@ -95,10 +95,10 @@
           <th class="th-qr">QR</th>
           <th>Asset ID</th>
           <th>Name</th>
-          <th>Category</th>
+          <th class="col-sm-hide">Category</th>
           <th>Location</th>
           <th>Status</th>
-          <th>Serial No.</th>
+          <th class="col-sm-hide">Serial No.</th>
           <th class="th-actions">Actions</th>
         </tr>
       </thead>
@@ -121,10 +121,10 @@
             <a href="{{ url_for('asset_detail', asset_id=a.asset_id) }}" target="_blank" class="asset-link">{{ a.name }}</a>
             {% if a.description %}<div class="td-sub">{{ a.description[:60] }}{% if a.description|length > 60 %}…{% endif %}</div>{% endif %}
           </td>
-          <td>{{ a.category or '—' }}</td>
+          <td class="col-sm-hide">{{ a.category or '—' }}</td>
           <td>{{ a.location or '—' }}</td>
           <td><span class="badge badge--{{ a.status }}">{{ a.status }}</span></td>
-          <td class="td-mono">{{ a.serial_number or '—' }}</td>
+          <td class="td-mono col-sm-hide">{{ a.serial_number or '—' }}</td>
           <td class="td-actions">
             <button class="icon-btn" title="Edit" onclick="openEditModal({{ a.id }})">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
