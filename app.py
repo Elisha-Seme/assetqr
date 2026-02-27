@@ -5,9 +5,12 @@ import io
 import shutil
 import sqlite3
 from datetime import datetime
+from functools import wraps
 from io import BytesIO
 
-from flask import Flask, render_template, request, jsonify, send_file, g
+from flask import (Flask, render_template, request, jsonify,
+                   send_file, g, session, redirect, url_for, flash)
+from werkzeug.security import generate_password_hash, check_password_hash
 import qrcode
 import qrcode.constants
 from reportlab.lib import colors
@@ -18,6 +21,7 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image as RLImage
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'afosi-assetqr-k3y-2025-change-in-settings')
 
 # ── Vercel / environment detection ────────────────────────────────────────────
 IS_VERCEL   = bool(os.environ.get('VERCEL'))
@@ -92,7 +96,13 @@ def init_db():
         INSERT OR IGNORE INTO settings VALUES ('base_url',      'http://localhost:5001');
         INSERT OR IGNORE INTO settings VALUES ('company_name',  'My Organization');
         INSERT OR IGNORE INTO settings VALUES ('qr_color',      '#000000');
+        INSERT OR IGNORE INTO settings VALUES ('admin_username', 'admin');
     ''')
+    # Default password: afosi2025  (change via Settings page)
+    existing_pw = db.execute("SELECT value FROM settings WHERE key='admin_password_hash'").fetchone()
+    if not existing_pw:
+        db.execute("INSERT INTO settings VALUES ('admin_password_hash', ?)",
+                   (generate_password_hash('afosi2025'),))
     # Migration: add new columns to existing DBs that predate this schema
     for col in ('custodian', 'donor', 'value_ksh'):
         try:
@@ -101,6 +111,65 @@ def init_db():
             pass  # column already exists
     db.commit()
     db.close()
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login', next=request.path))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('logged_in'):
+        return redirect(url_for('dashboard'))
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        db = get_db()
+        stored_user = db.execute("SELECT value FROM settings WHERE key='admin_username'").fetchone()
+        stored_hash = db.execute("SELECT value FROM settings WHERE key='admin_password_hash'").fetchone()
+        if (stored_user and stored_hash
+                and username == stored_user['value']
+                and check_password_hash(stored_hash['value'], password)):
+            session['logged_in'] = True
+            session['username']  = username
+            next_url = request.args.get('next') or url_for('dashboard')
+            return redirect(next_url)
+        error = 'Invalid username or password.'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/api/change-password', methods=['POST'])
+@login_required
+def api_change_password():
+    d  = request.json or {}
+    db = get_db()
+    stored = db.execute("SELECT value FROM settings WHERE key='admin_password_hash'").fetchone()
+    if not stored or not check_password_hash(stored['value'], d.get('current_password', '')):
+        return jsonify({'error': 'Current password is incorrect'}), 400
+    new_pw = (d.get('new_password') or '').strip()
+    if len(new_pw) < 6:
+        return jsonify({'error': 'New password must be at least 6 characters'}), 400
+    db.execute("INSERT OR REPLACE INTO settings VALUES ('admin_password_hash', ?)",
+               (generate_password_hash(new_pw),))
+    if d.get('new_username'):
+        db.execute("INSERT OR REPLACE INTO settings VALUES ('admin_username', ?)",
+                   (d['new_username'].strip(),))
+    db.commit()
+    return jsonify({'success': True})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -148,23 +217,25 @@ def make_qr(asset_id):
 # ── Page routes ───────────────────────────────────────────────────────────────
 
 @app.route('/')
+@login_required
 def dashboard():
     db = get_db()
     stats = {
-        'total':      db.execute('SELECT COUNT(*) FROM assets').fetchone()[0],
-        'active':     db.execute("SELECT COUNT(*) FROM assets WHERE status='active'").fetchone()[0],
-        'maintenance':db.execute("SELECT COUNT(*) FROM assets WHERE status='maintenance'").fetchone()[0],
-        'retired':    db.execute("SELECT COUNT(*) FROM assets WHERE status='retired'").fetchone()[0],
-        'categories': db.execute("SELECT COUNT(DISTINCT category) FROM assets WHERE category!=''").fetchone()[0],
+        'total':       db.execute('SELECT COUNT(*) FROM assets').fetchone()[0],
+        'active':      db.execute("SELECT COUNT(*) FROM assets WHERE status='active'").fetchone()[0],
+        'maintenance': db.execute("SELECT COUNT(*) FROM assets WHERE status='maintenance'").fetchone()[0],
+        'retired':     db.execute("SELECT COUNT(*) FROM assets WHERE status='retired'").fetchone()[0],
+        'categories':  db.execute("SELECT COUNT(DISTINCT category) FROM assets WHERE category!=''").fetchone()[0],
     }
     by_cat = db.execute(
         "SELECT category, COUNT(*) cnt FROM assets WHERE category!='' GROUP BY category ORDER BY cnt DESC LIMIT 8"
     ).fetchall()
-    recent = db.execute('SELECT * FROM assets ORDER BY created_at DESC LIMIT 10').fetchall()
+    recent = db.execute('SELECT * FROM assets ORDER BY asset_id LIMIT 10').fetchall()
     return render_template('index.html', stats=stats, by_cat=by_cat, recent=recent)
 
 
 @app.route('/assets')
+@login_required
 def assets_page():
     db  = get_db()
     q   = request.args.get('q', '')
@@ -179,7 +250,7 @@ def assets_page():
         sql += ' AND category=?'; params.append(cat)
     if st:
         sql += ' AND status=?'; params.append(st)
-    sql += ' ORDER BY name'
+    sql += ' ORDER BY asset_id'          # AFOSI-001, 002, 003 ...
 
     assets = db.execute(sql, params).fetchall()
     cats   = [r[0] for r in db.execute(
@@ -188,24 +259,27 @@ def assets_page():
     return render_template('assets.html', assets=assets, cats=cats, q=q, cat=cat, status=st)
 
 
+# ── Public: QR scan target (no login needed) ──────────────────────────────────
 @app.route('/asset/<asset_id>')
 def asset_detail(asset_id):
     db    = get_db()
     asset = db.execute('SELECT * FROM assets WHERE asset_id=?', (asset_id,)).fetchone()
     if not asset:
         return render_template('404.html', msg=f'Asset "{asset_id}" not found'), 404
-    company = setting('company_name', 'Asset Registry')
+    company  = setting('company_name', 'Asset Registry')
     base_url = setting('base_url', 'http://localhost:5001')
-    qr_url  = f'{base_url}/asset/{asset_id}'
+    qr_url   = f'{base_url}/asset/{asset_id}'
     return render_template('asset_detail.html', asset=asset, company=company, qr_url=qr_url)
 
 
 @app.route('/import')
+@login_required
 def import_page():
     return render_template('import.html')
 
 
 @app.route('/settings')
+@login_required
 def settings_page():
     db = get_db()
     s  = {r['key']: r['value'] for r in db.execute('SELECT * FROM settings').fetchall()}
@@ -215,12 +289,14 @@ def settings_page():
 # ── API ───────────────────────────────────────────────────────────────────────
 
 @app.route('/api/assets', methods=['GET'])
+@login_required
 def api_list():
     db = get_db()
-    return jsonify([dict(r) for r in db.execute('SELECT * FROM assets ORDER BY name').fetchall()])
+    return jsonify([dict(r) for r in db.execute('SELECT * FROM assets ORDER BY asset_id').fetchall()])
 
 
 @app.route('/api/assets', methods=['POST'])
+@login_required
 def api_create():
     d  = request.json or {}
     db = get_db()
@@ -251,6 +327,7 @@ def api_create():
 
 
 @app.route('/api/assets/bulk', methods=['POST'])
+@login_required
 def api_bulk():
     items = (request.json or {}).get('items', [])
     db    = get_db()
@@ -288,6 +365,7 @@ def api_bulk():
 
 
 @app.route('/api/assets/<int:aid>', methods=['GET'])
+@login_required
 def api_get(aid):
     db  = get_db()
     row = db.execute('SELECT * FROM assets WHERE id=?', (aid,)).fetchone()
@@ -297,6 +375,7 @@ def api_get(aid):
 
 
 @app.route('/api/assets/<int:aid>', methods=['PUT'])
+@login_required
 def api_update(aid):
     d   = request.json or {}
     db  = get_db()
@@ -322,6 +401,7 @@ def api_update(aid):
 
 
 @app.route('/api/assets/<int:aid>', methods=['DELETE'])
+@login_required
 def api_delete(aid):
     db  = get_db()
     row = db.execute('SELECT * FROM assets WHERE id=?', (aid,)).fetchone()
@@ -338,6 +418,7 @@ def api_delete(aid):
 
 
 @app.route('/api/assets/<int:aid>/regen-qr', methods=['POST'])
+@login_required
 def api_regen_qr(aid):
     db  = get_db()
     row = db.execute('SELECT * FROM assets WHERE id=?', (aid,)).fetchone()
@@ -350,6 +431,7 @@ def api_regen_qr(aid):
 
 
 @app.route('/api/settings', methods=['POST'])
+@login_required
 def api_settings():
     d  = request.json or {}
     db = get_db()
@@ -373,7 +455,7 @@ def _query_assets(db):
     if ids_p:
         id_list = [int(x) for x in ids_p.split(',') if x.strip().isdigit()]
         ph = ','.join('?'*len(id_list))
-        return db.execute(f'SELECT * FROM assets WHERE id IN ({ph}) ORDER BY name', id_list).fetchall()
+        return db.execute(f'SELECT * FROM assets WHERE id IN ({ph}) ORDER BY asset_id', id_list).fetchall()
 
     sql, params = 'SELECT * FROM assets WHERE 1=1', []
     if q:
@@ -382,10 +464,11 @@ def _query_assets(db):
         sql += ' AND category=?'; params.append(cat)
     if st:
         sql += ' AND status=?'; params.append(st)
-    return db.execute(sql+' ORDER BY name', params).fetchall()
+    return db.execute(sql+' ORDER BY asset_id', params).fetchall()
 
 
 @app.route('/export/pdf')
+@login_required
 def export_pdf():
     db      = get_db()
     assets  = _query_assets(db)
@@ -457,6 +540,7 @@ def export_pdf():
 
 
 @app.route('/export/labels')
+@login_required
 def export_labels():
     db     = get_db()
     assets = _query_assets(db)
@@ -529,6 +613,7 @@ def export_labels():
 
 
 @app.route('/export/csv')
+@login_required
 def export_csv():
     db     = get_db()
     assets = _query_assets(db)

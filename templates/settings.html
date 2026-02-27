@@ -67,6 +67,38 @@
     </div>
     <div id="settings-msg" class="card-body" style="display:none;padding-top:0"></div>
   </div>
+
+  <div class="card">
+    <div class="card-header"><h2 class="card-title">Change Login Password</h2></div>
+    <div class="card-body">
+      <div class="form-grid" style="grid-template-columns:1fr">
+        <div class="form-group">
+          <label for="pw-username">Username</label>
+          <input type="text" id="pw-username" placeholder="Leave blank to keep current" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="pw-current">Current Password <span class="req">*</span></label>
+          <input type="password" id="pw-current" placeholder="Enter current password" autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label for="pw-new">New Password <span class="req">*</span></label>
+          <input type="password" id="pw-new" placeholder="Min. 6 characters" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="pw-confirm">Confirm New Password <span class="req">*</span></label>
+          <input type="password" id="pw-confirm" placeholder="Repeat new password" autocomplete="new-password">
+        </div>
+      </div>
+      <div id="pw-msg" style="display:none;margin-top:12px"></div>
+      <button class="btn btn-primary btn--sm" style="margin-top:14px" onclick="changePassword()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0110 0v4"/>
+        </svg>
+        Update Password
+      </button>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -128,6 +160,59 @@ async function regenAllQR() {
   } finally {
     btn.disabled = false; btn.textContent = 'Regenerate All QR Codes';
   }
+}
+
+async function changePassword() {
+  const cur  = document.getElementById('pw-current').value;
+  const nw   = document.getElementById('pw-new').value.trim();
+  const conf = document.getElementById('pw-confirm').value.trim();
+  const user = document.getElementById('pw-username').value.trim();
+  const msg  = document.getElementById('pw-msg');
+
+  msg.style.display = 'none';
+  if (!cur)       { showPwMsg('Current password is required', 'error'); return; }
+  if (!nw)        { showPwMsg('New password is required', 'error'); return; }
+  if (nw !== conf){ showPwMsg('Passwords do not match', 'error'); return; }
+  if (nw.length < 6) { showPwMsg('Password must be at least 6 characters', 'error'); return; }
+
+  const btn = event.currentTarget;
+  btn.disabled = true; btn.textContent = 'Updating…';
+  try {
+    const res = await fetch('/api/change-password', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ current_password: cur, new_password: nw, new_username: user || undefined })
+    });
+    const d = await res.json();
+    if (d.success) {
+      showPwMsg('Password updated successfully! Please sign in again.', 'success');
+      document.getElementById('pw-current').value = '';
+      document.getElementById('pw-new').value = '';
+      document.getElementById('pw-confirm').value = '';
+      document.getElementById('pw-username').value = '';
+      setTimeout(() => { window.location.href = '/logout'; }, 1500);
+    } else {
+      showPwMsg(d.error || 'Update failed', 'error');
+    }
+  } catch(e) {
+    showPwMsg('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Update Password';
+  }
+}
+
+function showPwMsg(text, type) {
+  const el = document.getElementById('pw-msg');
+  el.style.display = '';
+  el.style.padding = '10px 14px';
+  el.style.borderRadius = '8px';
+  el.style.fontSize = '13px';
+  el.style.fontWeight = '500';
+  if (type === 'error') {
+    el.style.background = '#fee2e2'; el.style.color = '#991b1b';
+  } else {
+    el.style.background = '#dcfce7'; el.style.color = '#166534';
+  }
+  el.textContent = text;
 }
 </script>
 {% endblock %}
