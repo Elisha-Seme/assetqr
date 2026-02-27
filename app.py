@@ -75,6 +75,9 @@ def init_db():
             status        TEXT    DEFAULT 'active',
             serial_number TEXT    DEFAULT '',
             purchase_date TEXT    DEFAULT '',
+            custodian     TEXT    DEFAULT '',
+            donor         TEXT    DEFAULT '',
+            value_ksh     TEXT    DEFAULT '',
             notes         TEXT    DEFAULT '',
             qr_code_path  TEXT    DEFAULT '',
             created_at    TEXT    DEFAULT (datetime('now')),
@@ -90,6 +93,12 @@ def init_db():
         INSERT OR IGNORE INTO settings VALUES ('company_name',  'My Organization');
         INSERT OR IGNORE INTO settings VALUES ('qr_color',      '#000000');
     ''')
+    # Migration: add new columns to existing DBs that predate this schema
+    for col in ('custodian', 'donor', 'value_ksh'):
+        try:
+            db.execute(f"ALTER TABLE assets ADD COLUMN {col} TEXT DEFAULT ''")
+        except Exception:
+            pass  # column already exists
     db.commit()
     db.close()
 
@@ -225,12 +234,14 @@ def api_create():
 
     db.execute('''
         INSERT INTO assets (asset_id, name, category, description, location,
-                            status, serial_number, purchase_date, notes)
-        VALUES (?,?,?,?,?,?,?,?,?)
+                            status, serial_number, purchase_date,
+                            custodian, donor, value_ksh, notes)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     ''', (asset_id, name,
           d.get('category',''), d.get('description',''), d.get('location',''),
           d.get('status','active'), d.get('serial_number',''),
-          d.get('purchase_date',''), d.get('notes','')))
+          d.get('purchase_date',''), d.get('custodian',''),
+          d.get('donor',''), d.get('value_ksh',''), d.get('notes','')))
     db.commit()
 
     qp = make_qr(asset_id)
@@ -257,12 +268,14 @@ def api_bulk():
         try:
             db.execute('''
                 INSERT INTO assets (asset_id, name, category, description, location,
-                                    status, serial_number, purchase_date, notes)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                                    status, serial_number, purchase_date,
+                                    custodian, donor, value_ksh, notes)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
             ''', (asset_id, name,
                   item.get('category',''), item.get('description',''), item.get('location',''),
                   item.get('status','active'), item.get('serial_number',''),
-                  item.get('purchase_date',''), item.get('notes','')))
+                  item.get('purchase_date',''), item.get('custodian',''),
+                  item.get('donor',''), item.get('value_ksh',''), item.get('notes','')))
             db.commit()
             qp = make_qr(asset_id)
             db.execute('UPDATE assets SET qr_code_path=? WHERE asset_id=?', (qp, asset_id))
@@ -293,13 +306,16 @@ def api_update(aid):
 
     db.execute('''
         UPDATE assets SET name=?, category=?, description=?, location=?,
-            status=?, serial_number=?, purchase_date=?, notes=?,
+            status=?, serial_number=?, purchase_date=?,
+            custodian=?, donor=?, value_ksh=?, notes=?,
             updated_at=datetime('now')
         WHERE id=?
     ''', (d.get('name', row['name']), d.get('category', row['category']),
           d.get('description', row['description']), d.get('location', row['location']),
           d.get('status', row['status']), d.get('serial_number', row['serial_number']),
-          d.get('purchase_date', row['purchase_date']), d.get('notes', row['notes']),
+          d.get('purchase_date', row['purchase_date']),
+          d.get('custodian', row['custodian']), d.get('donor', row['donor']),
+          d.get('value_ksh', row['value_ksh']), d.get('notes', row['notes']),
           aid))
     db.commit()
     return jsonify(dict(db.execute('SELECT * FROM assets WHERE id=?', (aid,)).fetchone()))
@@ -388,14 +404,14 @@ def export_pdf():
 
     STATUS_CLR = {'active':'#16a34a', 'maintenance':'#d97706', 'retired':'#dc2626'}
 
-    col_w = [2.4*cm, 3*cm, 5.5*cm, 3.5*cm, 4*cm, 2.2*cm, 3*cm, 5*cm]
-    rows  = [['QR Code','Asset ID','Name','Category','Location','Status','Serial No.','Description']]
+    col_w = [2.2*cm, 2.5*cm, 4.5*cm, 2.8*cm, 3*cm, 2*cm, 3*cm, 3.2*cm, 4.3*cm]
+    rows  = [['QR Code','Asset ID','Name','Category','Location','Status','Serial No.','Custodian','Donor / Programme']]
 
     for a in assets:
         qr_cell = Paragraph('—', s8)
         if a['qr_code_path'] and os.path.exists(a['qr_code_path']):
             try:
-                qr_cell = RLImage(a['qr_code_path'], width=2*cm, height=2*cm)
+                qr_cell = RLImage(a['qr_code_path'], width=1.8*cm, height=1.8*cm)
             except Exception:
                 pass
         sc_st = ParagraphStyle('scs', parent=s8,
@@ -408,7 +424,8 @@ def export_pdf():
             Paragraph(a['location'] or '', s8),
             Paragraph((a['status'] or '').title(), sc_st),
             Paragraph(a['serial_number'] or '', sc),
-            Paragraph(a['description'] or '', sc),
+            Paragraph(a['custodian'] or '', sc),
+            Paragraph(a['donor'] or '', sc),
         ])
 
     tbl = Table(rows, colWidths=col_w, repeatRows=1)
@@ -517,12 +534,13 @@ def export_csv():
     assets = _query_assets(db)
     out    = io.StringIO()
     w      = csv.writer(out)
-    w.writerow(['asset_id','name','category','location','status',
-                'serial_number','description','purchase_date','notes','created_at'])
+    w.writerow(['asset_id','name','category','location','status','serial_number',
+                'description','custodian','donor','value_ksh','purchase_date','notes','created_at'])
     for a in assets:
         w.writerow([a['asset_id'], a['name'], a['category'], a['location'], a['status'],
-                    a['serial_number'], a['description'], a['purchase_date'],
-                    a['notes'], a['created_at']])
+                    a['serial_number'], a['description'],
+                    a['custodian'], a['donor'], a['value_ksh'],
+                    a['purchase_date'], a['notes'], a['created_at']])
     out.seek(0)
     fname = f'assets_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
     return send_file(io.BytesIO(out.getvalue().encode()),

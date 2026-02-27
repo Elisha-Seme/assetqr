@@ -109,9 +109,37 @@
       </div>
       {% endif %}
 
+      {% if asset.custodian %}
+      <div class="info-item">
+        <div class="info-label">Custodian</div>
+        <div class="info-value">{{ asset.custodian }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.donor %}
+      <div class="info-item">
+        <div class="info-label">Donor / Programme</div>
+        <div class="info-value">{{ asset.donor }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.value_ksh %}
+      <div class="info-item">
+        <div class="info-label">Value (KSh)</div>
+        <div class="info-value">{{ "{:,.0f}".format(asset.value_ksh|float) }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.purchase_date %}
+      <div class="info-item">
+        <div class="info-label">Purchase Date</div>
+        <div class="info-value">{{ asset.purchase_date }}</div>
+      </div>
+      {% endif %}
+
       {% if asset.description %}
       <div class="info-item info-item--full">
-        <div class="info-label">Description</div>
+        <div class="info-label">Model / Specs</div>
         <div class="info-value">{{ asset.description }}</div>
       </div>
       {% endif %}
