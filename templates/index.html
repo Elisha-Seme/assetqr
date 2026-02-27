@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AssetQR{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-sub">Asset inventory overview</p>
+  </div>
+  <button class="btn btn-primary" onclick="openAddModal()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Add Asset
+  </button>
+</div>
+
+<!-- Stats row -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon stat-icon--blue">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+        <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+      </svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Total Assets</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon stat-icon--green">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.active }}</div>
+      <div class="stat-label">Active</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon stat-icon--yellow">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.maintenance }}</div>
+      <div class="stat-label">Maintenance</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon stat-icon--red">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.retired }}</div>
+      <div class="stat-label">Retired</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon stat-icon--purple">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 3h6l2 4-2 2a12 12 0 006 6l2-2 4 2v6a2 2 0 01-2 2A18 18 0 013 5a2 2 0 012-2z"/>
+      </svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.categories }}</div>
+      <div class="stat-label">Categories</div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <!-- By Category -->
+  {% if by_cat %}
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Assets by Category</h2>
+    </div>
+    <div class="card-body" style="padding:0">
+      {% set max_count = by_cat[0].cnt %}
+      {% for row in by_cat %}
+      <div class="cat-row">
+        <span class="cat-name">{{ row.category or 'Uncategorised' }}</span>
+        <div class="cat-bar-wrap">
+          <div class="cat-bar" style="width:{{ (row.cnt / max_count * 100)|int }}%"></div>
+        </div>
+        <span class="cat-count">{{ row.cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Recent Assets -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Recently Added</h2>
+      <a href="{{ url_for('assets_page') }}" class="card-link">View all &rarr;</a>
+    </div>
+    <div class="card-body" style="padding:0">
+      {% if recent %}
+      <table class="table table--compact">
+        <thead>
+          <tr>
+            <th>Asset ID</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in recent %}
+          <tr>
+            <td><code class="code-id">{{ a.asset_id }}</code></td>
+            <td><a href="{{ url_for('asset_detail', asset_id=a.asset_id) }}" target="_blank">{{ a.name }}</a></td>
+            <td>{{ a.category or '—' }}</td>
+            <td><span class="badge badge--{{ a.status }}">{{ a.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <p>No assets yet. <a href="{{ url_for('import_page') }}">Import a list</a> or <a href="#" onclick="openAddModal()">add one</a>.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

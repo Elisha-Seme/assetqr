@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ asset.name }} — {{ company }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #f1f5f9; color: #1e293b; min-height: 100vh; }
+    .header { background: #1e293b; color: white; padding: 16px 20px;
+               display: flex; align-items: center; gap: 10px; }
+    .header-icon { width: 28px; height: 28px; }
+    .header-icon svg { width: 28px; height: 28px; stroke: white; }
+    .header-company { font-size: 14px; font-weight: 600; }
+    .header-sub { font-size: 11px; opacity: 0.6; margin-top: 1px; }
+    .container { max-width: 480px; margin: 0 auto; padding: 20px 16px; }
+    .qr-card { background: white; border-radius: 16px; padding: 24px;
+                text-align: center; margin-bottom: 16px;
+                box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06); }
+    .qr-card img { width: 200px; height: 200px; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .qr-asset-id { font-family: monospace; font-size: 13px; color: #64748b;
+                    background: #f8fafc; padding: 4px 10px; border-radius: 20px;
+                    display: inline-block; margin-top: 10px; }
+    .info-card { background: white; border-radius: 16px; padding: 20px;
+                  box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06); }
+    .asset-name { font-size: 22px; font-weight: 700; margin-bottom: 6px; line-height: 1.3; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px;
+              font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+    .badge-active      { background: #dcfce7; color: #166534; }
+    .badge-maintenance { background: #fef3c7; color: #92400e; }
+    .badge-retired     { background: #fee2e2; color: #991b1b; }
+    .divider { border: none; border-top: 1px solid #f1f5f9; margin: 16px 0; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .info-item { }
+    .info-item--full { grid-column: 1 / -1; }
+    .info-label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+                   color: #94a3b8; font-weight: 600; margin-bottom: 3px; }
+    .info-value { font-size: 14px; color: #1e293b; font-weight: 500; word-break: break-word; }
+    .info-value--mono { font-family: monospace; font-size: 13px; }
+    .info-value--empty { color: #cbd5e1; font-style: italic; font-weight: 400; }
+    .qr-url { font-size: 10px; color: #94a3b8; margin-top: 8px; word-break: break-all; }
+    .footer { text-align: center; padding: 20px; font-size: 11px; color: #94a3b8; }
+    @media (max-width: 360px) {
+      .info-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3M14 21h5"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-company">{{ company }}</div>
+    <div class="header-sub">Asset Registry</div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="qr-card">
+    {% if asset.qr_code_path %}
+    <img src="/static/qrcodes/qr_{{ asset.asset_id }}.png" alt="QR Code for {{ asset.asset_id }}">
+    {% else %}
+    <div style="width:200px;height:200px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#94a3b8;margin:0 auto">No QR</div>
+    {% endif %}
+    <div class="qr-asset-id">{{ asset.asset_id }}</div>
+    <div class="qr-url">{{ qr_url }}</div>
+  </div>
+
+  <div class="info-card">
+    <div class="asset-name">{{ asset.name }}</div>
+    {% set badge_cls = {'active':'badge-active','maintenance':'badge-maintenance','retired':'badge-retired'} %}
+    <span class="badge {{ badge_cls.get(asset.status, '') }}">{{ asset.status }}</span>
+
+    <hr class="divider">
+
+    <div class="info-grid">
+      {% if asset.category %}
+      <div class="info-item">
+        <div class="info-label">Category</div>
+        <div class="info-value">{{ asset.category }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.location %}
+      <div class="info-item">
+        <div class="info-label">Location</div>
+        <div class="info-value">{{ asset.location }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.serial_number %}
+      <div class="info-item">
+        <div class="info-label">Serial Number</div>
+        <div class="info-value info-value--mono">{{ asset.serial_number }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.purchase_date %}
+      <div class="info-item">
+        <div class="info-label">Purchase Date</div>
+        <div class="info-value">{{ asset.purchase_date }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.description %}
+      <div class="info-item info-item--full">
+        <div class="info-label">Description</div>
+        <div class="info-value">{{ asset.description }}</div>
+      </div>
+      {% endif %}
+
+      {% if asset.notes %}
+      <div class="info-item info-item--full">
+        <div class="info-label">Notes</div>
+        <div class="info-value">{{ asset.notes }}</div>
+      </div>
+      {% endif %}
+
+      <div class="info-item">
+        <div class="info-label">Registered</div>
+        <div class="info-value" style="font-size:12px">{{ asset.created_at[:10] if asset.created_at else '—' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Powered by AssetQR &mdash; {{ company }}
+</div>
+
+</body>
+</html>

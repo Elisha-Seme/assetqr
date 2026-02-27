@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Not Found — AssetQR{% endblock %}
+{% block content %}
+<div class="empty-page" style="margin-top:80px">
+  <div class="empty-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+    </svg>
+  </div>
+  <h2>Asset Not Found</h2>
+  <p>{{ msg or 'The requested asset does not exist.' }}</p>
+  <a href="{{ url_for('assets_page') }}" class="btn btn-primary">Browse Assets</a>
+</div>
+{% endblock %}
